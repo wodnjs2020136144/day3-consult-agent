@@ -15,7 +15,7 @@ import com.skala.day3.tools.OrderTools;
 import com.skala.day3.tools.RefundTools;
 
 /**
- * ★ TODO ⑥ — Step 4 (교안 p.301), 완료 기준 4·6.
+ * Step 4 — ChatClient 조립(교안 p.301), 완료 기준 4·6.
  *
  * <p>목적: 공통으로 해야 할 일은 Advisor로 모은다. <b>순서가 곧 정책이다</b> — 차단은
  * 저장(메모리)보다 앞에 있어야 한다. 도구는 {@code defaultTools}로 붙인다.
@@ -32,17 +32,8 @@ import com.skala.day3.tools.RefundTools;
 @Configuration
 public class Day3AiConfig {
 
-    // TODO ⑥: builder.defaultAdvisors(...)에 아래 순서로 조립한다.
-    //   order  10  tokenMeter        — 계측은 가장 바깥(전체 시간을 잰다)
-    //   order 100  safety            — 차단은 저장보다 앞
-    //   order 200  MessageChatMemoryAdvisor.builder(chatMemory).order(200).build()
-    //   order 300  QuestionAnswerAdvisor.builder(vectorStore)
-    //                  .searchRequest(SearchRequest.builder()
-    //                      .topK(props.rag().topK())
-    //                      .similarityThreshold(props.rag().threshold())
-    //                      .build())
-    //                  .order(300).build()
-    // TODO ⑥: builder.defaultTools(orderTools, refundTools)로 도구 두 개를 등록한다.
+    // Advisor 순서: 계측(10) → 차단(100) → 메모리(200) → RAG(300).
+    // 모델이 사용할 수 있는 도구는 주문 조회와 환불 접수 두 개로 제한한다.
     @Bean
     public ChatClient assistantChatClient(ChatClient.Builder builder,
                                           VectorStore vectorStore,
@@ -52,6 +43,23 @@ public class Day3AiConfig {
                                           TokenMeterAdvisor tokenMeter,
                                           OrderTools orderTools,
                                           RefundTools refundTools) {
-        throw new UnsupportedOperationException("TODO ⑥: Day3AiConfig.assistantChatClient 를 구현하세요");
+        MessageChatMemoryAdvisor memoryAdvisor = MessageChatMemoryAdvisor.builder(chatMemory)
+                .order(200)
+                .build();
+
+        SearchRequest searchRequest = SearchRequest.builder()
+                .topK(props.rag().topK())
+                .similarityThreshold(props.rag().threshold())
+                .build();
+        QuestionAnswerAdvisor ragAdvisor = QuestionAnswerAdvisor.builder(vectorStore)
+                .searchRequest(searchRequest)
+                .order(300)
+                .build();
+
+        // 계측은 order 10으로 가장 바깥에 두어 Safety·Memory·RAG·모델까지 전체 시간을 잰다.
+        return builder
+                .defaultAdvisors(tokenMeter, safety, memoryAdvisor, ragAdvisor)
+                .defaultTools(orderTools, refundTools)
+                .build();
     }
 }

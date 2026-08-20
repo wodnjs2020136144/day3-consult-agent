@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 import com.skala.day3.repository.OrderRepository;
 
 /**
- * ★ TODO ① — Step 1 (교안 p.298), 완료 기준 1·2.
+ * Step 1 — 주문 조회 도구(교안 p.298), 완료 기준 1·2.
  *
  * <p>목적: 모델은 코드를 보지 않는다. {@code description}만 본다. 사용자 ID는 파라미터가 아니라
  * {@link ToolContext}로 받는다(모델이 바꿔 부를 수 없는 통로). 소유자 검증은 이미 완성된
@@ -32,13 +32,33 @@ public class OrderTools {
         this.orders = orders;
     }
 
-    // TODO ①: @Tool description을 채운다 — "주문 상태를 조회한다. 사용자가 주문번호를 말하거나
-    //          '내 주문', '배송 언제' 처럼 물으면 이 도구를 쓴다." 같은 형태.
-    // TODO ①: @ToolParam description에 orderId 예시("예: 12345")를 넣는다.
-    // TODO ①: userId를 ToolContext에서 꺼내 orders.findByIdAndOwnerId(orderId, userId)로 조회하고,
-    //          없으면 "해당 주문을 찾을 수 없습니다." 같은 안전한 실패 문구를 반환한다(예외를 던지지 않는다).
-    @Tool(description = "TODO: 여기에 도구 설명을 채운다")
-    public String orderStatus(@ToolParam(description = "TODO") String orderId, ToolContext context) {
-        throw new UnsupportedOperationException("TODO ①: OrderTools.orderStatus 를 구현하세요");
+    @Tool(description = """
+            주문번호로 주문 상태와 예상 도착일을 조회한다. 사용자가 주문번호를 명시하면서
+            배송 또는 주문 상태를 물을 때만 이 도구를 사용한다. 주문번호가 없는
+            '내 주문 어디야', '배송 언제 와' 같은 질문에는 이 도구를 호출하지 말고 주문번호를 먼저 묻는다.
+            """)
+    public String orderStatus(
+            @ToolParam(description = "조회할 주문번호. 예: 12345") String orderId,
+            ToolContext context) {
+
+        // userId는 모델이 만드는 도구 인자가 아니라 서버가 넣어 주는 ToolContext에서만 받는다.
+        // 따라서 사용자가 프롬프트로 다른 사람의 userId를 주입해도 권한 기준은 바뀌지 않는다.
+        String userId = currentUser(context);
+
+        // 주문번호와 소유자를 한 번에 조건으로 조회한다. 없는 주문과 남의 주문에는 같은 문구를
+        // 반환하여 주문의 존재 여부까지 노출하지 않고, 예외로 전체 대화를 중단시키지도 않는다.
+        return orders.findByIdAndOwnerId(orderId, userId)
+                .map(order -> "주문 %s · 품목 %s · 상태 %s · 예상도착 %s"
+                        .formatted(order.id(), order.item(), order.status(), order.eta()))
+                .orElse("해당 주문을 찾을 수 없습니다.");
+    }
+
+    /** 인증 정보가 누락되면 조회를 진행하지 않는 fail-closed 방식으로 처리한다. */
+    private String currentUser(ToolContext context) {
+        Object userId = context == null ? null : context.getContext().get("userId");
+        if (userId == null || userId.toString().isBlank()) {
+            throw new IllegalStateException("toolContext에 userId가 없습니다.");
+        }
+        return userId.toString();
     }
 }

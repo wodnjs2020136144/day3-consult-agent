@@ -1,19 +1,22 @@
 package com.skala.day3.service;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.document.Document;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.skala.day3.audit.ToolUsageTracker;
 import com.skala.day3.domain.ChatAnswer;
 import com.skala.day3.domain.SourceRef;
 
 /**
- * ★ TODO ⑦ — Step 5 (교안 p.302), 완료 기준 5.
+ * Step 5 — 멀티턴 대화와 구조화 응답(교안 p.302), 완료 기준 5.
  *
  * <p>목적: {@code conversationId}를 <b>이 한 곳에서만</b> 만든다. 규칙이 흩어지면 남의 대화가
  * 섞이는 사고가 난다 — 메모리에서 가장 흔한 버그이고, 가장 늦게 발견된다(교안 함정).
@@ -29,30 +32,56 @@ public class ConsultService {
 
     private final ChatClient chat;
     private final ChatMemory chatMemory;
+    private final ToolUsageTracker toolUsageTracker;
 
+    /** 단위 테스트에서 모델 없이 conversationId만 검증할 때 사용하는 생성자. */
     public ConsultService(ChatClient assistantChatClient, ChatMemory chatMemory) {
+        this(assistantChatClient, chatMemory, new ToolUsageTracker());
+    }
+
+    @Autowired
+    public ConsultService(ChatClient assistantChatClient,
+                          ChatMemory chatMemory,
+                          ToolUsageTracker toolUsageTracker) {
         this.chat = assistantChatClient;
         this.chatMemory = chatMemory;
+        this.toolUsageTracker = toolUsageTracker;
     }
 
     /**
      * 대화 ID 규칙 — 사용자·세션을 합쳐 하나로 만든다. 이 메서드 밖에서 조합하지 않는다.
      */
     public String conversationId(String userId, String sessionId) {
-        // TODO ⑦: "%s:%s".formatted(userId, sessionId) 같은 형태로 하나의 규칙을 만든다.
-        throw new UnsupportedOperationException("TODO ⑦: ConsultService.conversationId 를 구현하세요");
+        if (userId == null || userId.isBlank() || sessionId == null || sessionId.isBlank()) {
+            throw new IllegalArgumentException("userId와 sessionId는 비어 있을 수 없습니다.");
+        }
+        return "%s:%s".formatted(userId, sessionId);
     }
 
     public ChatAnswer ask(String question, String userId, String sessionId) {
-        // TODO ⑦: chat.prompt().user(question)
-        //            .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId(userId, sessionId)))
-        //            .toolContext(Map.of("userId", userId))
-        //            .call().chatClientResponse();
-        //          응답에서 response.context().get(QuestionAnswerAdvisor.RETRIEVED_DOCUMENTS)로
-        //          검색된 문서를 꺼내 SourceRef(source, version) 목록으로 변환한다(근거 없으면 빈 리스트).
-        //          toolUsed는 응답의 도구 호출 여부로 판단하거나, 단순화해 sources가 비어 있고
-        //          도구가 쓰였는지 여부를 별도로 추적해도 된다(README 참고).
-        throw new UnsupportedOperationException("TODO ⑦: ConsultService.ask 를 구현하세요");
+        String conversationId = conversationId(userId, sessionId);
+        toolUsageTracker.begin();
+
+        try {
+            ChatClientResponse response = chat.prompt()
+                    .user(question)
+                    .advisors(advisor -> advisor.param(ChatMemory.CONVERSATION_ID, conversationId))
+                    // 인증된 사용자 ID는 프롬프트가 아니라 모델이 변경할 수 없는 도구 컨텍스트로 전달한다.
+                    .toolContext(Map.of("userId", userId))
+                    .call()
+                    .chatClientResponse();
+
+            if (response == null || response.chatResponse() == null
+                    || response.chatResponse().getResult() == null) {
+                throw new IllegalStateException("AI 응답이 비어 있습니다.");
+            }
+
+            String answer = response.chatResponse().getResult().getOutput().getText();
+            return new ChatAnswer(answer, sourcesFrom(response), toolUsageTracker.wasUsed());
+        } finally {
+            // Tomcat 스레드는 재사용되므로 ThreadLocal을 지우지 않으면 다음 사용자의 결과에 섞인다.
+            toolUsageTracker.clear();
+        }
     }
 
     public List<String> history(String userId, String sessionId) {
@@ -65,7 +94,7 @@ public class ConsultService {
         chatMemory.clear(conversationId(userId, sessionId));
     }
 
-    /** 참고용 — QuestionAnswerAdvisor의 컨텍스트 키에서 출처를 뽑는 헬퍼(TODO ⑦에서 활용). */
+    /** QuestionAnswerAdvisor의 컨텍스트 키에서 출처를 뽑는다. */
     @SuppressWarnings("unchecked")
     protected List<SourceRef> sourcesFrom(ChatClientResponse response) {
         Object raw = response.context().get(QuestionAnswerAdvisor.RETRIEVED_DOCUMENTS);
