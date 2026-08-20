@@ -1,0 +1,198 @@
+# day3-consult-agent
+
+**Day 3 메인 실습 · 상담 에이전트 완성하기 (p.295–307)**
+
+대응하는 강사 제공 Gradle 프로젝트가 없다 — `skala-springai/SpringAI_실습/ch09_tools`(Tool
+Calling)·`ch10_toolsafe`(승인 게이트)·`11_승인게이트`·`12_Advisor순서`·`ch11_advisors`(Advisor
+조립·계측)를 참고해 직접 구현하는 결과물이다. 교안 자세한 설계 배경은 강의 자료 리포지토리
+`skala-springai`의 `docs/SpringAI-이해-및-활용_Day3_2026-08/02_lab-guide.md` "Day 3 메인 실습" 절을
+참조.
+
+**부팅은 되지만 오늘의 학습 지점 8곳은 비어 있는 상태로 커밋돼 있다.** 아래 파일들이
+`UnsupportedOperationException("TODO ①: ...")`을 던진다 — 이게 정상이다. 두 사람이 각자 브랜치에서
+채운다.
+
+## 실행
+
+```bash
+export OPENAI_API_KEY="sk-..."
+./gradlew bootRun          # VS Code 는 F5
+```
+
+## 확인
+
+```bash
+./gradlew test          # 시작 시점: 8건 실패, 3건 통과(진행바 — 아래 "테스트 = 진행바" 참고)
+
+curl -X POST localhost:8080/lab3/chat -H 'Content-Type: application/json' \
+     -d '{"question":"반품 규정 알려줘","sessionId":"s1"}'
+curl localhost:8080/lab3/admin/tickets/pending
+```
+
+Swagger UI — <http://localhost:8080/swagger-ui.html>
+
+지금 상태로 `/lab3/chat`을 호출하면 도구·Advisor·conversationId가 아직 비어 있어 예외가 난다 —
+스택트레이스는 노출되지 않고 안전한 문구 + traceId만 보인다(`Day3ExceptionHandler`, 완성).
+`/lab3/admin/tickets/pending`은 TODO와 무관하게 즉시 `[]`를 반환한다(완성).
+
+> ⚠️ **`day3-docs/*.md` 인제스트는 기동 시 자동으로 실행된다**(`PolicyIngestService`, 완성). 키가
+> 없거나 틀리면 이 단계만 실패하고 로그에 에러가 남지만 **앱은 계속 뜬다** — RAG 답변만 근거 없이
+> 나간다. 키를 맞춘 뒤 재시작하면 정상화된다.
+
+---
+
+## 테스트 = 진행바
+
+`./gradlew test`가 곧 완료 기준 체크리스트다. 시작 시점에 8건이 실패하는 게 정상 출발선이고,
+TODO를 하나씩 채울 때마다 해당 테스트가 통과로 바뀐다.
+
+| 테스트 | 처음 상태 | 통과하려면 | 완료 기준 |
+|---|---|---|---|
+| `AdvisorOrderTest` | ✅ 통과(이미 값이 맞다) | — | 6 |
+| `ConsultControllerTest` (2건) | ✅ 통과(서비스가 목이라 TODO와 무관) | — | — |
+| `OrderToolsTest` (3건) | ❌ 실패 | TODO ① | 1·2 |
+| `RefundToolsTest` (2건) | ❌ 실패 | TODO ② | 3 |
+| `ConversationIdTest` (3건) | ❌ 실패 | TODO ⑦ | 5 |
+
+TODO ③④⑤⑥에는 전용 단위 테스트가 없다(감사 로그·Advisor 조립·계측은 실행해서 눈으로 확인하는 게
+더 정확하다) — 완료 기준 4·6·7·8은 `bootRun` 후 curl과 `/actuator/metrics`로 확인한다.
+
+---
+
+## 협업 구조 — 경쟁이 아니라 "같은 조건, 교차 검증"
+
+**두 브랜치는 머지하지 않는다.** Day 3 완료 기준 9번(레드팀)은 "만든 사람이 아니라 옆 사람이
+공격한다"(p.304)는 게 핵심이라, 코드를 합치면 이 검증 자체가 성립하지 않는다.
+
+```
+main                            ← 이 스캐폴드 · day3-docs · 완성 배선(변경하지 않는다)
+├─ hwangjaewon/day3-consult-agent   ← 황재원: TODO ①~⑧ 전부 완주
+└─ parksungwoo/day3-consult-agent   ← 박성우: TODO ①~⑧ 전부 완주
+```
+
+**규칙**
+
+1. 두 브랜치는 **머지하지 않는다.** 각자 끝까지 간다.
+2. `main` 변경(이 문서, `day3-docs/*.md`, 스캐폴드 코드)은 **반드시 PR로** 올리고 서로 리뷰·승인한
+   뒤 머지한다.
+3. **90분 지점에서 서로의 브랜치로 전환해 교차 레드팀한다**(아래 "레드팀 절차" 참고). 결과는
+   상대 브랜치로 여는 PR 코멘트로 전달한다 — 이 PR도 머지하지 않는다, 리뷰 통로로만 쓴다.
+4. 한 번이라도 뚫린 경로는 **프롬프트가 아니라 코드로** 막고 재검증한다.
+5. `docs/레드팀-결과표.md`·`docs/결과보고서.md`는 각자 자기 브랜치에 자기 이름으로 채운다.
+
+### 시간 배분 (110분, 교안 p.295 배분 기준)
+
+| 구간 | 시간 | 내용 | TODO |
+|---|---|---|---|
+| 0. 준비 | 10분 | clone → 각자 브랜치 checkout → `./gradlew test`로 8건 실패 확인(출발선) | — |
+| 1. 도구·권한·승인 | 30분 | 주문 조회·환불 접수·감사 로깅 | ①②③ |
+| **동기화 체크포인트** | 3분 | 서로 막힌 곳만 말한다(알람 설정 권장) | — |
+| 2. Advisor·계측 | 30분 | 차단·조립·토큰 계측, 순서 실험(100→250→되돌리기) | ④⑤⑥ |
+| 3. 멀티턴 | 20분 | conversationId, 5턴 시나리오(교안 p.302) | ⑦ |
+| **4. 레드팀** | 20분 | 상대 브랜치로 전환해 8종 공격 | ⑧ |
+
+시간이 모자라면 **TODO ⑤(TokenMeterAdvisor, 완료 기준 8)를 가장 먼저 뺀다** — 9개 중 7개면
+목표 달성이고, 완료 기준 2·3·6번이 오늘의 진짜 학습 지점이라 이건 마지막까지 남긴다.
+
+### 레드팀 절차 (혼자서는 성립하지 않는 부분)
+
+```bash
+git fetch origin
+git checkout -b review/parksungwoo origin/parksungwoo/day3-consult-agent   # 상대 브랜치
+export OPENAI_API_KEY="sk-..."
+./gradlew bootRun
+```
+
+교안 p.304의 8종 공격(지시 무시·권한 우회·도구 오용·데이터 유출·간접 인젝션·반복 유도·개인정보·
+비용 공격)을 던지고 `docs/레드팀-결과표.md`에 기록한다. 상대 브랜치로 PR을 열어 결과를 코멘트로
+남긴다(머지하지 않는다).
+
+---
+
+## TODO 체크리스트 (Step별 · 완료 기준 · 참조 코드 매핑)
+
+| # | 파일 | 채울 것 | 교안 | 완료 기준 | 참조 |
+|---|---|---|---|---|---|
+| ① | `tools/OrderTools.java` | `@Tool` description + 소유자 검증 + 실패 문구 | Step 1 p.298 | 1·2 | `SpringAI_실습/ch09_tools/OrderTools.java` |
+| ② | `tools/RefundTools.java` | 환불 **접수까지만**(PENDING) + 권한 선검증 | Step 3 p.300 | 3 | `SpringAI_실습/11_승인게이트/SnackTools.java` |
+| ③ | `audit/ToolAuditAspect.java` | `@Around("@annotation(...Tool)")` 감사 + 마스킹 | Step 3 p.300 | 7 | `SpringAI_실습/ch10_toolsafe/ToolAuditAspect.java` |
+| ④ | `advisor/SafetyAdvisor.java` | 인젝션 차단(`before()`) | Step 4 p.301 | 6 | `SpringAI_실습/12_Advisor순서/이모지Advisor.java`(BaseAdvisor 골격) |
+| ⑤ | `advisor/TokenMeterAdvisor.java` | `ai.tokens`·`ai.latency` 카운터 | Step 6 p.303 | 8 | `SpringAI_실습/ch11_advisors/TokenMeterAdvisor.java` |
+| ⑥ | `config/Day3AiConfig.java` | ChatClient 빈 + Advisor 4종 순서 조립 + `defaultTools` | Step 4 p.301 | 4·6 | `SpringAI_실습/ch11_advisors/MemoryChatConfig.java`, `12_Advisor순서/Lab12Config.java` |
+| ⑦ | `service/ConsultService.java` | `conversationId` 한 곳에서 생성 + `toolContext` + 출처 추출 | Step 5 p.302 | 5 | 교안 Phase 3 코드(p.316) |
+| ⑧ | `docs/레드팀-결과표.md` | 8종 공격 실행 결과 기록 | Step 7 p.304 | 9 | — |
+
+**막히면 여는 것 — 검색하지 않는다, 이 표대로 바로 연다.**
+
+**자주 걸리는 함정 한 줄씩** (교안 트러블슈팅 표 p.305, 파일 안 Javadoc에도 있다):
+
+- **TODO ①·②** — 도구가 안 불리면 90%는 설명(`description`) 문제다. 함수명을 바꾸기 전에 설명부터
+  고친다. `userId`를 파라미터로 받으면 안 된다 — `ToolContext`로만 받는다(모델이 못 바꾼다).
+- **TODO ②** — "즉시 처리됨"이 보이면 도구가 확정까지 하고 있다는 뜻이다. `TicketRepository.create`
+  까지만 부르고, `approve`는 `AdminController`(도구 목록 밖)에서만 부른다.
+- **TODO ④·⑥** — 차단 Advisor의 `order`가 메모리 Advisor의 `order`보다 반드시 작아야 한다(예:
+  100 < 200). `AdvisorOrderTest`가 이걸 코드로 못 박는다. 실험 후 되돌리는 걸 잊지 않는다.
+- **TODO ⑤** — `CallAdvisor`만 구현하면 스트리밍에서 계측이 빠진다(이 리포지토리는 스트리밍을
+  다루지 않으므로 해당 없음 — 확장 과제로 SSE를 붙이면 그때 `StreamAdvisor`도 구현한다).
+- **TODO ⑦** — 대화 ID 규칙을 이 메서드 밖에서 조합하지 않는다. 흩어지면 남의 대화가 섞인다 —
+  메모리에서 가장 흔한 버그이고 가장 늦게 발견된다.
+
+---
+
+## 확장 과제 — 더 할 시간이 있다면
+
+메인 실습 9개 완료 기준을 다 채운 뒤에만 손댄다(p.306).
+
+| 확장 과제 | 참조 | 난이도 |
+|---|---|---|
+| MCP 연결(외부 도구) | `SpringAI_실습/spring-ai-2-step-samples/step08-mcp-client` | 중간 |
+| 병렬 도구 호출 | — | 높음 |
+| 폴백 모델 | `SpringAI_실습/ch12_ops/FallbackChatService.java` | 중간 |
+| 시맨틱 캐시 | `SpringAI_실습/ch12_ops/SemanticCacheService.java` | 중간 |
+| SSE 스트리밍 | `SpringAI_실습/14_SSE와추적ID/StreamLab.java` | 중간 |
+| pgvector 전환 | `docker-compose.yml`(이 저장소) | 낮음 |
+
+---
+
+## 1.1.8 → 2.0.0 이식 메모
+
+이 프로젝트는 Day 1·2 메인 실습·`skala-springai`의 `CLAUDE.md` 고정값과 맞춰
+**Boot 4.1.0 + spring-ai-bom 2.0.0**을 쓴다. 참조한 강사 샘플(`ch09_tools`·`ch10_toolsafe`·
+`11_승인게이트`·`12_Advisor순서`·`ch11_advisors`·`ch12_ops`)은 전부 **Boot 3.5.16 + spring-ai
+1.1.8**이다. 코드를 옮길 때 아래를 바꾼다.
+
+| 강사 샘플(1.1.8) | 이 프로젝트(2.0.0) |
+|---|---|
+| `implementation 'org.springframework.boot:spring-boot-starter-aop'` | ⚠️ **좌표가 아예 다르다.** Boot 4부터 `spring-boot-starter-aop`는 존재하지 않는다 — `spring-boot-starter-aspectj`를 쓴다(실컴파일로 확정, `spring-boot-starter-aop`의 Maven 메타데이터에 4.x 버전이 없음을 확인했다) |
+| BOM: `ext { springAiVersion = '1.1.8' } / dependencyManagement { imports { ... } }` | `implementation platform("org.springframework.ai:spring-ai-bom:2.0.0")` |
+| `QuestionAnswerAdvisor`가 필요할 때 | 좌표는 `org.springframework.ai:spring-ai-vector-store-advisor`다(`spring-ai-advisors-vector-store`가 아니다 — `day2-rag-qna`에서 실컴파일로 확정한 값, 이 프로젝트에서 재확인함) |
+| Boot 3.5.16의 `@WebMvcTest` | Boot 4는 `spring-boot-starter-webmvc-test` 스타터가 별도로 있어야 딸려온다(이미 `build.gradle`에 있다). import도 `org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest`로 바뀐다 |
+| `new TokenTextSplitter()` | deprecated. `TokenTextSplitter.builder().withChunkSize(400)...build()` |
+
+`@Tool`·`ToolContext`(`org.springframework.ai.chat.model.ToolContext`)·`.tools().toolContext()`·
+`MessageChatMemoryAdvisor.builder(memory)`·`SimpleVectorStore`·`TextReader`는 1.1.8과 2.0.0 양쪽 다
+같은 좌표·패키지·시그니처로 존재한다(Context7 문서 + 실컴파일로 확인함) — 참조 코드를 거의
+그대로 옮길 수 있다.
+
+## 이 폴더에 있는 것
+
+- `domain/*.java` — `Order`·`Ticket`·`ChatRequest`·`ChatAnswer`·`SourceRef`(응답 모양, 완성)
+- `repository/OrderRepository.java` — 고정 주문 데이터, **소유자 조건이 쿼리 안에 있다**(완성)
+- `repository/TicketRepository.java` — 접수(PENDING)/승인(APPROVED) 분리(완성)
+- `rag/PolicyIngestService.java` — 기동 시 `day3-docs/*.md` 자동 인제스트(완성)
+- `config/Day3VectorStoreConfig.java` — 인메모리 VectorStore 빈(완성)
+- `config/Day3ChatMemoryConfig.java` — 대화 메모리 빈, `day3.memory.max` 윈도우(완성)
+- `config/Day3Properties.java` — `day3.rag`·`day3.memory`·`day3.tool` 외부화(완성)
+- `config/Day3AiConfig.java` — 답변용 `ChatClient` 빈 + Advisor 조립 — **TODO ⑥**
+- `tools/OrderTools.java` — **TODO ①**
+- `tools/RefundTools.java` — **TODO ②**
+- `audit/ToolAuditAspect.java` — **TODO ③**
+- `advisor/SafetyAdvisor.java` — **TODO ④**
+- `advisor/TokenMeterAdvisor.java` — **TODO ⑤**
+- `service/ConsultService.java` — **TODO ⑦**
+- `web/ConsultController.java`, `web/AdminController.java` — REST 엔드포인트(완성, 손대지 않는다)
+- `web/Day3ExceptionHandler.java`, `ErrorResponse.java` — 예외 응답, 스택트레이스 미노출(완성)
+- `src/main/resources/day3-docs/` — 반품·배송·교환 규정 3종
+- `docs/레드팀-결과표.md` — **TODO ⑧**(공격 8종 기록 템플릿)
+- `docs/결과보고서.md` — 완료 기준 실측·회고 골격
+- `docker-compose.yml` — 확장 과제 "pgvector 전환" 전용

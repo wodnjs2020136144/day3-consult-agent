@@ -1,0 +1,59 @@
+spring:
+  application:
+    name: day3-consult-agent
+
+  ai:
+    openai:
+      # 키는 소스에 넣지 않는다.  export OPENAI_API_KEY="sk-..."
+      api-key: ${OPENAI_API_KEY:not-set}
+      chat:
+        options:
+          model: gpt-4o-mini
+          temperature: 0.3
+      embedding:
+        options:
+          model: text-embedding-3-small
+
+    # 운영에서는 프롬프트 원문 로깅을 반드시 끈다(개인정보가 그대로 쌓인다).
+    chat:
+      observations:
+        log-prompt: false
+      client:
+        observations:
+          log-prompt: false
+
+day3:
+  rag:
+    top-k: 4
+    threshold: 0.5
+  memory:
+    max: 20
+  tool:
+    max-calls: 5
+
+server:
+  port: 8080
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+    display-request-duration: true
+    doc-expansion: none
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  metrics:
+    tags:
+      application: day3-consult-agent
+
+logging:
+  level:
+    com.skala.day3: DEBUG
+    AI_TOOL_AUDIT: INFO

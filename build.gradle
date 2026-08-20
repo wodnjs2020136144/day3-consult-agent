@@ -1,0 +1,67 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.0'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.skala'
+version = '1.0.0'
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(21) }
+}
+
+// 편집기·OS 가 달라도 한글 주석·프롬프트가 깨지지 않게 인코딩을 고정한다.
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+tasks.withType(Test).configureEach { systemProperty 'file.encoding', 'UTF-8' }
+tasks.named('bootRun') { jvmArgs = ['-Dfile.encoding=UTF-8'] }
+
+repositories { mavenCentral() }
+
+// Day 3 메인 실습 — 상담 에이전트(RAG + Tool Calling + Advisor 체인 + 감사·승인 게이트 + 계측)
+
+dependencies {
+    // ── 웹 · 문서 · 관찰 ────────────────────────────────────────
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    // Boot 4부터 좌표가 spring-boot-starter-aop → spring-boot-starter-aspectj로 바뀌었다
+    // (실컴파일로 확인 — aop는 4.x에 존재하지 않는다. ch10_toolsafe 등 1.1.8 계열 샘플의
+    // 'spring-boot-starter-aop'를 그대로 옮기면 여기서 막힌다).
+    implementation 'org.springframework.boot:spring-boot-starter-aspectj'      // 도구 호출 감사 Aspect
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6'   // /swagger-ui.html
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'                  // /actuator/prometheus
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    // Boot 4 부터 @WebMvcTest(org.springframework.boot.webmvc.test.autoconfigure) 는
+    // spring-boot-starter-test 가 아니라 이 신규 스타터가 있어야 딸려온다.
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+
+    // ===============================
+    // Spring AI BOM — CLAUDE.md 고정값(Day 1·2와 동일)
+    // ===============================
+    implementation platform(
+        "org.springframework.ai:spring-ai-bom:2.0.0"
+    )
+
+    // ===============================
+    // Spring AI + OpenAI
+    // ===============================
+    implementation 'org.springframework.ai:spring-ai-starter-model-openai'
+
+    // ===============================
+    // RAG — 인메모리 VectorStore(SimpleVectorStore). 청킹(TokenTextSplitter)·문서 읽기(TextReader)는
+    // spring-ai-commons에 있어 이 의존성만으로 전이 포함된다(day2-rag-qna에서 실컴파일 확인).
+    // ===============================
+    implementation 'org.springframework.ai:spring-ai-vector-store'
+
+    // ===============================
+    // QuestionAnswerAdvisor — Step 4(Advisor 조립)에 필요.
+    // ⚠️ 2.0.0 BOM에서는 spring-ai-advisors-vector-store가 아니라 spring-ai-vector-store-advisor다
+    // (강사 샘플 1.1.8 계열 좌표명과 다르다 — day2-rag-qna에서 실컴파일로 확정한 값).
+    // ===============================
+    implementation 'org.springframework.ai:spring-ai-vector-store-advisor'
+}
+
+tasks.named('test') { useJUnitPlatform() }
+
+springBoot { mainClass = 'com.skala.day3.Day3Application' }

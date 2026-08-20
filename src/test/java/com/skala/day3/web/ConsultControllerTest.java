@@ -1,0 +1,58 @@
+package com.skala.day3.web;
+
+import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import com.skala.day3.domain.ChatAnswer;
+import com.skala.day3.service.ConsultService;
+
+/**
+ * 웹 계층만 확인 — 모델을 부르지 않으므로 키 없이 돈다.
+ * {@code ConsultService}를 Mockito로 대체해 컨트롤러 배선만 검증한다(완성 상태 — 손대지 않는다).
+ *
+ * <p>TODO ⑦(ConsultService)이 완성되기 전에도 이 테스트는 통과한다 — 서비스는 목이기 때문이다.
+ */
+@WebMvcTest(ConsultController.class)
+class ConsultControllerTest {
+
+    @Autowired
+    MockMvc mvc;
+
+    @MockitoBean
+    ConsultService consultService;
+
+    @Test
+    void 채팅_요청은_200과_구조화된_답변을_돌려준다() throws Exception {
+        given(consultService.ask("반품 규정 알려줘", "user1", "s1"))
+                .willReturn(new ChatAnswer("7일 이내 반품 가능합니다.", List.of(), false));
+
+        mvc.perform(post("/lab3/chat")
+                        .param("userId", "user1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"question":"반품 규정 알려줘","sessionId":"s1"}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.answer").value("7일 이내 반품 가능합니다."));
+    }
+
+    @Test
+    void 이력_조회는_200을_돌려준다() throws Exception {
+        given(consultService.history("user1", "s1")).willReturn(List.of("USER: 안녕"));
+
+        mvc.perform(get("/lab3/chat/history").param("sessionId", "s1").param("userId", "user1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").value("USER: 안녕"));
+    }
+}
