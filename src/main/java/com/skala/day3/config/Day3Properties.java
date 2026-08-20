@@ -9,13 +9,16 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param rag   RAG 검색 파라미터
  * @param memory 대화 메모리 윈도우
  * @param tool  도구 호출 안전장치(Step 3 함정 "같은 도구를 무한 호출" 대비 상한)
+ * @param security 실습용 Basic 인증 비밀번호(환경변수로 교체)
  */
 @ConfigurationProperties(prefix = "day3")
-public record Day3Properties(Rag rag, Memory memory, Tool tool) {
+public record Day3Properties(Rag rag, Memory memory, Tool tool, Security security) {
 
     public record Rag(int topK, double threshold) {}
 
     public record Memory(int max) {}
 
     public record Tool(int maxCalls) {}
+
+    public record Security(String user1Password, String user2Password, String adminPassword) {}
 }

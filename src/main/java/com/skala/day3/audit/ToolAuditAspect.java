@@ -42,7 +42,6 @@ public class ToolAuditAspect {
 
     @Around("@annotation(org.springframework.ai.tool.annotation.Tool)")
     public Object auditToolCall(ProceedingJoinPoint joinPoint) throws Throwable {
-        usageTracker.markUsed();
         String tool = joinPoint.getSignature().getDeclaringType().getSimpleName()
                 + "#" + joinPoint.getSignature().getName();
         Object[] rawArgs = joinPoint.getArgs();
@@ -51,11 +50,13 @@ public class ToolAuditAspect {
         long started = System.nanoTime();
 
         try {
+            // 실제 도구 진입 전에 횟수를 검사하여 6번째 호출부터 업무 로직을 실행하지 않는다.
+            int callNumber = usageTracker.markUsed();
             Object result = joinPoint.proceed();
             long elapsedMs = (System.nanoTime() - started) / 1_000_000;
             registry.counter("ai.tool.calls", "tool", tool, "result", "ok").increment();
-            audit.info("tool={} user={} args={} result={} status=OK elapsedMs={}",
-                    tool, userId, args, mask(String.valueOf(result)), elapsedMs);
+            audit.info("tool={} call={} user={} args={} result={} status=OK elapsedMs={}",
+                    tool, callNumber, userId, args, mask(String.valueOf(result)), elapsedMs);
             return result;
         } catch (Throwable e) {
             long elapsedMs = (System.nanoTime() - started) / 1_000_000;

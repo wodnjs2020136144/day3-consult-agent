@@ -32,6 +32,11 @@ day3:
     max: 20
   tool:
     max-calls: 5
+  security:
+    # 비밀번호는 소스에 기본값을 두지 않는다. 실행 전에 세 환경변수를 반드시 등록한다.
+    user1-password: ${DAY3_USER1_PASSWORD}
+    user2-password: ${DAY3_USER2_PASSWORD}
+    admin-password: ${DAY3_ADMIN_PASSWORD}
 
 server:
   port: 8080

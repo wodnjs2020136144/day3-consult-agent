@@ -9,21 +9,49 @@ import org.springframework.stereotype.Component;
 @Component
 public class ToolUsageTracker {
 
-    private final ThreadLocal<Boolean> used = ThreadLocal.withInitial(() -> false);
+    private final ThreadLocal<State> state = new ThreadLocal<>();
 
-    public void begin() {
-        used.set(false);
+    public void begin(int maxCalls) {
+        if (maxCalls < 1) {
+            throw new IllegalArgumentException("maxCalls는 1 이상이어야 합니다.");
+        }
+        state.set(new State(maxCalls));
     }
 
-    public void markUsed() {
-        used.set(true);
+    /** 도구 실행 직전에 호출하며, 설정된 상한을 넘으면 실제 도구 메서드 진입을 차단한다. */
+    public int markUsed() {
+        State current = state.get();
+        if (current == null) {
+            throw new IllegalStateException("도구 호출 추적이 시작되지 않았습니다.");
+        }
+        if (current.calls >= current.maxCalls) {
+            throw new ToolCallLimitExceededException(current.maxCalls);
+        }
+        current.calls++;
+        return current.calls;
     }
 
     public boolean wasUsed() {
-        return used.get();
+        State current = state.get();
+        return current != null && current.calls > 0;
+    }
+
+    public int callCount() {
+        State current = state.get();
+        return current == null ? 0 : current.calls;
     }
 
     public void clear() {
-        used.remove();
+        state.remove();
+    }
+
+    private static final class State {
+
+        private final int maxCalls;
+        private int calls;
+
+        private State(int maxCalls) {
+            this.maxCalls = maxCalls;
+        }
     }
 }

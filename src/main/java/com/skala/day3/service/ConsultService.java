@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.skala.day3.audit.ToolUsageTracker;
+import com.skala.day3.config.Day3Properties;
 import com.skala.day3.domain.ChatAnswer;
 import com.skala.day3.domain.SourceRef;
 
@@ -33,19 +34,29 @@ public class ConsultService {
     private final ChatClient chat;
     private final ChatMemory chatMemory;
     private final ToolUsageTracker toolUsageTracker;
+    private final int maxToolCalls;
 
     /** 단위 테스트에서 모델 없이 conversationId만 검증할 때 사용하는 생성자. */
     public ConsultService(ChatClient assistantChatClient, ChatMemory chatMemory) {
-        this(assistantChatClient, chatMemory, new ToolUsageTracker());
+        this(assistantChatClient, chatMemory, new ToolUsageTracker(), 5);
     }
 
     @Autowired
     public ConsultService(ChatClient assistantChatClient,
                           ChatMemory chatMemory,
-                          ToolUsageTracker toolUsageTracker) {
+                          ToolUsageTracker toolUsageTracker,
+                          Day3Properties props) {
+        this(assistantChatClient, chatMemory, toolUsageTracker, props.tool().maxCalls());
+    }
+
+    private ConsultService(ChatClient assistantChatClient,
+                           ChatMemory chatMemory,
+                           ToolUsageTracker toolUsageTracker,
+                           int maxToolCalls) {
         this.chat = assistantChatClient;
         this.chatMemory = chatMemory;
         this.toolUsageTracker = toolUsageTracker;
+        this.maxToolCalls = maxToolCalls;
     }
 
     /**
@@ -60,7 +71,7 @@ public class ConsultService {
 
     public ChatAnswer ask(String question, String userId, String sessionId) {
         String conversationId = conversationId(userId, sessionId);
-        toolUsageTracker.begin();
+        toolUsageTracker.begin(maxToolCalls);
 
         try {
             ChatClientResponse response = chat.prompt()

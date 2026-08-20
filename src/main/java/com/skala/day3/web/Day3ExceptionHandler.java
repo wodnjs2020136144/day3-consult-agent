@@ -8,6 +8,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.security.access.AccessDeniedException;
 
 /**
  * 완성 상태로 제공된다 — 손대지 않는다.
@@ -20,11 +22,30 @@ public class Day3ExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(Day3ExceptionHandler.class);
 
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException e) {
+        String traceId = UUID.randomUUID().toString();
+        log.warn("[{}] 접근 권한 없음", traceId);
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ErrorResponse("접근 권한이 없습니다.", traceId));
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException e) {
+        String traceId = UUID.randomUUID().toString();
+        String message = e.getBindingResult().getFieldErrors().stream()
+                .findFirst()
+                .map(error -> error.getDefaultMessage())
+                .orElse("요청 값이 올바르지 않습니다.");
+        log.warn("[{}] 입력 검증 실패: {}", traceId, message);
+        return ResponseEntity.badRequest().body(new ErrorResponse(message, traceId));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(IllegalArgumentException e) {
         String traceId = UUID.randomUUID().toString();
         log.warn("[{}] {}", traceId, e.getMessage());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse(e.getMessage(), traceId));
     }
 

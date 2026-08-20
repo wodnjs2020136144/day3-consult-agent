@@ -7,11 +7,13 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import com.skala.day3.domain.Ticket;
 import com.skala.day3.repository.TicketRepository;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
@@ -25,6 +27,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
  */
 @RestController
 @Tag(name = "Day3 메인 실습 · 관리자(승인)")
+@SecurityRequirement(name = "basicAuth")
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
     private final TicketRepository tickets;

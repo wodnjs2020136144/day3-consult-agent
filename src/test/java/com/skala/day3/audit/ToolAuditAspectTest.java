@@ -1,6 +1,7 @@
 package com.skala.day3.audit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Map;
 
@@ -34,12 +35,21 @@ class ToolAuditAspectTest {
     @Autowired
     MeterRegistry registry;
 
+    @Autowired
+    ToolUsageTracker usageTracker;
+
     @Test
     void 도구_호출을_기록하고_개인정보를_마스킹한다(CapturedOutput output) throws Throwable {
-        String result = refundTools.requestRefund(
-                "12345",
-                "연락처 user@example.com, 카드 1111-2222-3333-4444",
-                new ToolContext(Map.of("userId", "user1")));
+        usageTracker.begin(5);
+        String result;
+        try {
+            result = refundTools.requestRefund(
+                    "12345",
+                    "연락처 user@example.com, 카드 1111-2222-3333-4444",
+                    new ToolContext(Map.of("userId", "user1")));
+        } finally {
+            usageTracker.clear();
+        }
 
         assertThat(result).contains("접수");
         assertThat(output)
@@ -54,6 +64,24 @@ class ToolAuditAspectTest {
                 .tags("tool", "RefundTools#requestRefund", "result", "ok")
                 .counter()
                 .count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void 설정된_도구_호출_상한을_넘으면_실제_메서드_진입을_막는다() {
+        ToolContext context = new ToolContext(Map.of("userId", "user1"));
+        usageTracker.begin(2);
+
+        try {
+            refundTools.requestRefund("12345", "첫 번째", context);
+            refundTools.requestRefund("12345", "두 번째", context);
+
+            assertThatThrownBy(() -> refundTools.requestRefund("12345", "세 번째", context))
+                    .isInstanceOf(ToolCallLimitExceededException.class)
+                    .hasMessageContaining("2회");
+            assertThat(usageTracker.callCount()).isEqualTo(2);
+        } finally {
+            usageTracker.clear();
+        }
     }
 
     @Configuration
