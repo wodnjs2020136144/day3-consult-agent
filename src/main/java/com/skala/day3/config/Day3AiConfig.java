@@ -32,17 +32,6 @@ import com.skala.day3.tools.RefundTools;
 @Configuration
 public class Day3AiConfig {
 
-    // TODO ⑥: builder.defaultAdvisors(...)에 아래 순서로 조립한다.
-    //   order  10  tokenMeter        — 계측은 가장 바깥(전체 시간을 잰다)
-    //   order 100  safety            — 차단은 저장보다 앞
-    //   order 200  MessageChatMemoryAdvisor.builder(chatMemory).order(200).build()
-    //   order 300  QuestionAnswerAdvisor.builder(vectorStore)
-    //                  .searchRequest(SearchRequest.builder()
-    //                      .topK(props.rag().topK())
-    //                      .similarityThreshold(props.rag().threshold())
-    //                      .build())
-    //                  .order(300).build()
-    // TODO ⑥: builder.defaultTools(orderTools, refundTools)로 도구 두 개를 등록한다.
     @Bean
     public ChatClient assistantChatClient(ChatClient.Builder builder,
                                           VectorStore vectorStore,
@@ -52,6 +41,24 @@ public class Day3AiConfig {
                                           TokenMeterAdvisor tokenMeter,
                                           OrderTools orderTools,
                                           RefundTools refundTools) {
-        throw new UnsupportedOperationException("TODO ⑥: Day3AiConfig.assistantChatClient 를 구현하세요");
+        return builder
+                .defaultSystem("""
+                        당신은 쇼핑몰 상담 에이전트입니다. 사용자의 주문 조회·환불 접수·배송/반품/교환
+                        규정 안내를 돕습니다. 본인 소유가 아닌 주문 정보는 절대 알려주지 않습니다.
+                        규정에 없는 내용을 지어내지 말고, 확실하지 않으면 모른다고 답하세요.
+                        """)
+                .defaultAdvisors(
+                        tokenMeter,
+                        safety,
+                        MessageChatMemoryAdvisor.builder(chatMemory).order(200).build(),
+                        QuestionAnswerAdvisor.builder(vectorStore)
+                                .searchRequest(SearchRequest.builder()
+                                        .topK(props.rag().topK())
+                                        .similarityThreshold(props.rag().threshold())
+                                        .build())
+                                .order(300)
+                                .build())
+                .defaultTools(orderTools, refundTools)
+                .build();
     }
 }

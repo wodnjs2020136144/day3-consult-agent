@@ -28,13 +28,31 @@ public class TokenMeterAdvisor implements CallAdvisor {
         this.registry = registry;
     }
 
-    // TODO ⑤: chain.nextCall(request)로 다음 Advisor/모델을 호출하고, 걸린 시간을
-    //          registry.timer("ai.latency")에 기록한다. 응답의 Usage(promptTokens·
-    //          completionTokens)를 registry.counter("ai.tokens", "type", "prompt"/"completion")에
-    //          더한다.
     @Override
     public ChatClientResponse adviseCall(ChatClientRequest request, CallAdvisorChain chain) {
-        throw new UnsupportedOperationException("TODO ⑤: TokenMeterAdvisor.adviseCall 을 구현하세요");
+        long start = System.nanoTime();
+        try {
+            ChatClientResponse response = chain.nextCall(request);
+            recordTokens(response);
+            return response;
+        } finally {
+            registry.timer("ai.latency").record(System.nanoTime() - start, java.util.concurrent.TimeUnit.NANOSECONDS);
+        }
+    }
+
+    private void recordTokens(ChatClientResponse response) {
+        if (response == null || response.chatResponse() == null
+                || response.chatResponse().getMetadata() == null
+                || response.chatResponse().getMetadata().getUsage() == null) {
+            return;
+        }
+        var usage = response.chatResponse().getMetadata().getUsage();
+        if (usage.getPromptTokens() != null) {
+            registry.counter("ai.tokens", "type", "prompt").increment(usage.getPromptTokens());
+        }
+        if (usage.getCompletionTokens() != null) {
+            registry.counter("ai.tokens", "type", "completion").increment(usage.getCompletionTokens());
+        }
     }
 
     @Override

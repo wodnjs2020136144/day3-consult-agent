@@ -1,9 +1,16 @@
 package com.skala.day3.advisor;
 
+import java.util.List;
+import java.util.regex.Pattern;
+
 import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.client.advisor.api.AdvisorChain;
 import org.springframework.ai.chat.client.advisor.api.BaseAdvisor;
+import org.springframework.ai.chat.client.advisor.api.CallAdvisorChain;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
 import org.springframework.stereotype.Component;
 
 /**
@@ -24,18 +31,53 @@ import org.springframework.stereotype.Component;
 @Component
 public class SafetyAdvisor implements BaseAdvisor {
 
-    // TODO ④: 차단할 패턴(예: "이전 지시 무시", "시스템 프롬프트 출력", 주민등록번호 형태)을
-    //          정의하고, before()에서 사용자 메시지에 매칭되면 체인을 계속 진행하지 않고
-    //          바로 거절 응답을 만들어 반환한다(가장 단순하게는 요청에 안전 지시를 덧붙이거나,
-    //          AdvisorChain을 호출하지 않고 직접 ChatClientResponse를 구성해 반환한다).
+    private static final String REJECTION_MESSAGE =
+            "죄송하지만 해당 요청은 처리할 수 없습니다. 상담 가능한 범위 내에서 다시 문의해 주세요.";
+
+    // 인젝션(지시 무시·시스템 프롬프트 노출) · 관리자 사칭 · 주민등록번호 형태 · 과도하게 긴 입력(비용 공격)을 막는다.
+    private static final List<Pattern> BLOCKED_PATTERNS = List.of(
+            Pattern.compile("이전\\s*지시.*무시"),
+            Pattern.compile("모든\\s*지시.*무시"),
+            Pattern.compile("시스템\\s*프롬프트"),
+            Pattern.compile("(너의|당신의)\\s*(규칙|프롬프트|지시사항)"),
+            Pattern.compile("나\\s*관리자"),
+            Pattern.compile("관리자\\s*권한"),
+            Pattern.compile("\\d{6}-\\d{7}"));
+
+    private static final int MAX_INPUT_LENGTH = 2000;
+
+    // before()/after()는 BaseAdvisor 인터페이스 요구사항이라 구현하되, 실제 차단 로직은
+    // adviseCall()에서 처리한다 — before()만으로는 체인 진행 자체를 막을 수 없기 때문이다.
     @Override
     public ChatClientRequest before(ChatClientRequest req, AdvisorChain chain) {
-        throw new UnsupportedOperationException("TODO ④: SafetyAdvisor.before 를 구현하세요");
+        return req;
     }
 
     @Override
     public ChatClientResponse after(ChatClientResponse res, AdvisorChain chain) {
         return res;
+    }
+
+    @Override
+    public ChatClientResponse adviseCall(ChatClientRequest request, CallAdvisorChain chain) {
+        String userText = request.prompt().getUserMessage().getText();
+        if (isBlocked(userText)) {
+            return ChatClientResponse.builder()
+                    .chatResponse(new ChatResponse(List.of(new Generation(new AssistantMessage(REJECTION_MESSAGE)))))
+                    .context(request.context())
+                    .build();
+        }
+        return chain.nextCall(request);
+    }
+
+    private boolean isBlocked(String text) {
+        if (text == null) {
+            return false;
+        }
+        if (text.length() > MAX_INPUT_LENGTH) {
+            return true;
+        }
+        return BLOCKED_PATTERNS.stream().anyMatch(p -> p.matcher(text).find());
     }
 
     @Override
