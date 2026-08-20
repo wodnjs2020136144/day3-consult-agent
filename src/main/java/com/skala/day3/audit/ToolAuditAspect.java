@@ -1,10 +1,14 @@
 package com.skala.day3.audit;
 
+import java.util.Arrays;
+import java.util.regex.Pattern;
+
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.stereotype.Component;
 
 /**
@@ -28,13 +32,49 @@ public class ToolAuditAspect {
 
     private static final Logger audit = LoggerFactory.getLogger("AI_TOOL_AUDIT");
 
-    // TODO ③: @Around("@annotation(org.springframework.ai.tool.annotation.Tool)")로
-    //          모든 @Tool 메서드 호출을 가로챈다.
-    // TODO ③: 도구명(joinPoint.getSignature()...) · 인자(joinPoint.getArgs()) · 결과를 로깅한다.
-    //          인자에 주민등록번호·카드번호·이메일 형태가 있으면 마스킹한다(정규식 치환).
-    // TODO ③: 예외가 나면 status=FAIL로 기록하고 다시 던진다(대화 전체를 막지 않는다).
+    // 주민등록번호(123456-1234567) · 카드번호(1234-1234-1234-1234) · 이메일 형태를 마스킹한다.
+    private static final Pattern RRN = Pattern.compile("\\d{6}-\\d{7}");
+    private static final Pattern CARD = Pattern.compile("\\d{4}-\\d{4}-\\d{4}-\\d{4}");
+    private static final Pattern EMAIL = Pattern.compile("[\\w.+-]+@[\\w-]+\\.[\\w.-]+");
+
     @Around("@annotation(org.springframework.ai.tool.annotation.Tool)")
     public Object auditToolCall(ProceedingJoinPoint joinPoint) throws Throwable {
-        throw new UnsupportedOperationException("TODO ③: ToolAuditAspect.auditToolCall 을 구현하세요");
+        String toolName = joinPoint.getSignature().getName();
+        String userId = extractUserId(joinPoint.getArgs());
+        String args = mask(Arrays.stream(joinPoint.getArgs())
+                .filter(a -> !(a instanceof ToolContext))
+                .map(String::valueOf)
+                .toList().toString());
+        long start = System.currentTimeMillis();
+
+        try {
+            Object result = joinPoint.proceed();
+            long elapsedMs = System.currentTimeMillis() - start;
+            audit.info("tool={} user={} args={} status=OK elapsedMs={} result={}",
+                    toolName, userId, args, elapsedMs, mask(String.valueOf(result)));
+            return result;
+        } catch (Throwable e) {
+            long elapsedMs = System.currentTimeMillis() - start;
+            audit.warn("tool={} user={} args={} status=FAIL elapsedMs={} error={}",
+                    toolName, userId, args, elapsedMs, e.getMessage());
+            throw e;
+        }
+    }
+
+    private String extractUserId(Object[] args) {
+        for (Object arg : args) {
+            if (arg instanceof ToolContext ctx) {
+                Object userId = ctx.getContext().get("userId");
+                return userId != null ? String.valueOf(userId) : "unknown";
+            }
+        }
+        return "unknown";
+    }
+
+    private String mask(String text) {
+        String masked = RRN.matcher(text).replaceAll("******-*******");
+        masked = CARD.matcher(masked).replaceAll("****-****-****-****");
+        masked = EMAIL.matcher(masked).replaceAll("***@***");
+        return masked;
     }
 }

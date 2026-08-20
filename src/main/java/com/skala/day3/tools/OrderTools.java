@@ -32,13 +32,14 @@ public class OrderTools {
         this.orders = orders;
     }
 
-    // TODO ①: @Tool description을 채운다 — "주문 상태를 조회한다. 사용자가 주문번호를 말하거나
-    //          '내 주문', '배송 언제' 처럼 물으면 이 도구를 쓴다." 같은 형태.
-    // TODO ①: @ToolParam description에 orderId 예시("예: 12345")를 넣는다.
-    // TODO ①: userId를 ToolContext에서 꺼내 orders.findByIdAndOwnerId(orderId, userId)로 조회하고,
-    //          없으면 "해당 주문을 찾을 수 없습니다." 같은 안전한 실패 문구를 반환한다(예외를 던지지 않는다).
-    @Tool(description = "TODO: 여기에 도구 설명을 채운다")
-    public String orderStatus(@ToolParam(description = "TODO") String orderId, ToolContext context) {
-        throw new UnsupportedOperationException("TODO ①: OrderTools.orderStatus 를 구현하세요");
+    @Tool(description = "주문 상태를 조회한다. 사용자가 주문번호를 말하거나 '내 주문', '배송 언제 와요' "
+            + "처럼 자신의 주문 상태·배송 현황을 물으면 이 도구를 쓴다.")
+    public String orderStatus(@ToolParam(description = "주문번호. 예: 12345") String orderId,
+                              ToolContext context) {
+        String userId = (String) context.getContext().get("userId");
+        return orders.findByIdAndOwnerId(orderId, userId)
+                .map(o -> "주문 %s: %s, 상태 %s, 도착예정 %s".formatted(
+                        o.id(), o.item(), o.status(), o.eta()))
+                .orElse("해당 주문을 찾을 수 없습니다.");
     }
 }
