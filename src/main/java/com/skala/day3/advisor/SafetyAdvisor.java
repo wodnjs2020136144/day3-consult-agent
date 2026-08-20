@@ -35,10 +35,14 @@ public class SafetyAdvisor implements CallAdvisor {
             "보안상 해당 요청은 처리할 수 없습니다. 주문·배송·반품 관련 다른 질문을 해 주세요.";
 
     private static final List<Pattern> BLOCKED_PATTERNS = List.of(
-            Pattern.compile("(?i)(이전|앞선|기존).{0,20}지시.{0,10}무시"),
+            Pattern.compile("(?i)(이전|앞선|기존|모든|지금까지(?:의)?|위).{0,30}"
+                    + "(지시|명령|규칙).{0,20}(무시|따르지|버려|삭제)"),
             Pattern.compile("(?i)ignore.{0,20}(previous|prior|system).{0,20}instruction"),
             Pattern.compile("(?i)(시스템|system).{0,10}(프롬프트|prompt).{0,20}(출력|공개|보여|print|show|reveal)"),
-            Pattern.compile("(?<!\\d)\\d{6}-[1-4]\\d{6}(?!\\d)"));
+            Pattern.compile("(?i)(문서|규정|검색 ?결과|컨텍스트).{0,50}(지시|명령).{0,20}"
+                    + "(따라|수행|무시|처리)"),
+            // 주민·외국인등록번호 등 6자리-7자리 식별자는 뒷자리 첫 숫자와 무관하게 저장 전에 차단한다.
+            Pattern.compile("(?<!\\d)\\d{6}-\\d{7}(?!\\d)"));
 
     /**
      * 위험 요청이면 다음 Advisor를 호출하지 않는다. 이 지점에서 체인을 끊어야 사용자 입력이
