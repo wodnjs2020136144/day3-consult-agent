@@ -1,6 +1,7 @@
 package com.skala.day3.audit;
 
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -52,6 +53,7 @@ public class ToolAuditAspect {
             long elapsedMs = System.currentTimeMillis() - start;
             audit.info("tool={} user={} args={} status=OK elapsedMs={} result={}",
                     toolName, userId, args, elapsedMs, mask(String.valueOf(result)));
+            markToolUsed(joinPoint.getArgs());
             return result;
         } catch (Throwable e) {
             long elapsedMs = System.currentTimeMillis() - start;
@@ -69,6 +71,20 @@ public class ToolAuditAspect {
             }
         }
         return "unknown";
+    }
+
+    /**
+     * ConsultService가 응답의 toolUsed 여부를 판단할 수 있게, toolContext에 실려 온
+     * AtomicBoolean을 도구 호출 성공 시 true로 세운다(최종 ChatResponse.hasToolCalls()는
+     * 도구 호출이 이미 해소된 뒤라 대체로 false이기 때문에 이 경로가 필요하다).
+     */
+    private void markToolUsed(Object[] args) {
+        for (Object arg : args) {
+            if (arg instanceof ToolContext ctx
+                    && ctx.getContext().get("toolUsed") instanceof AtomicBoolean flag) {
+                flag.set(true);
+            }
+        }
     }
 
     private String mask(String text) {

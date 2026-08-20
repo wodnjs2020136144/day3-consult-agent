@@ -1,6 +1,8 @@
 package com.skala.day3.service;
 
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.ChatClientResponse;
@@ -39,20 +41,19 @@ public class ConsultService {
      * 대화 ID 규칙 — 사용자·세션을 합쳐 하나로 만든다. 이 메서드 밖에서 조합하지 않는다.
      */
     public String conversationId(String userId, String sessionId) {
-        // TODO ⑦: "%s:%s".formatted(userId, sessionId) 같은 형태로 하나의 규칙을 만든다.
-        throw new UnsupportedOperationException("TODO ⑦: ConsultService.conversationId 를 구현하세요");
+        return "%s:%s".formatted(userId, sessionId);
     }
 
     public ChatAnswer ask(String question, String userId, String sessionId) {
-        // TODO ⑦: chat.prompt().user(question)
-        //            .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId(userId, sessionId)))
-        //            .toolContext(Map.of("userId", userId))
-        //            .call().chatClientResponse();
-        //          응답에서 response.context().get(QuestionAnswerAdvisor.RETRIEVED_DOCUMENTS)로
-        //          검색된 문서를 꺼내 SourceRef(source, version) 목록으로 변환한다(근거 없으면 빈 리스트).
-        //          toolUsed는 응답의 도구 호출 여부로 판단하거나, 단순화해 sources가 비어 있고
-        //          도구가 쓰였는지 여부를 별도로 추적해도 된다(README 참고).
-        throw new UnsupportedOperationException("TODO ⑦: ConsultService.ask 를 구현하세요");
+        AtomicBoolean toolUsed = new AtomicBoolean(false);
+
+        ChatClientResponse response = chat.prompt().user(question)
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId(userId, sessionId)))
+                .toolContext(Map.of("userId", userId, "toolUsed", toolUsed))
+                .call().chatClientResponse();
+
+        String answer = response.chatResponse().getResult().getOutput().getText();
+        return new ChatAnswer(answer, sourcesFrom(response), toolUsed.get());
     }
 
     public List<String> history(String userId, String sessionId) {
