@@ -61,9 +61,12 @@ Phase: 3 — 멀티턴
 
 ### Swagger UI 캡처 (Chrome)
 
-- `docs/캡처/01-lab3-chat-rag-출처.jpg` — `POST /lab3/chat` 규정 질문, 200 응답에 `sources` 2건
-- `docs/캡처/02-actuator-ai-tokens.jpg` — `GET /actuator/metrics/ai.tokens`
-- `docs/캡처/03-lab3-chat-인젝션-차단.jpg` — 인젝션 문장에 대한 즉시 거절 응답(200, `toolUsed=false`)
+- `docs/캡처/08-step4-rag-출처.jpg` — `POST /lab3/chat` 규정 질문, 200 응답에 `sources` 2건
+- `docs/캡처/15-step6-actuator-ai-tokens.jpg` — `GET /actuator/metrics/ai.tokens`
+- `docs/캡처/09-step4-인젝션-차단.jpg` — 인젝션 문장에 대한 즉시 거절 응답(200, `toolUsed=false`)
+
+> 2026-08-20 Phase 4 작업에서 `docs/캡처/` 전체를 결과보고서 Step 순서에 맞춰 재넘버링했다.
+> 이 세션 보고서가 처음 작성될 당시 파일명은 `01`·`02`·`03`이었다.
 
 ### AI_TOOL_AUDIT 로그 (실제 bootRun, 마스킹 적용 확인)
 
