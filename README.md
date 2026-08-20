@@ -8,9 +8,19 @@ Calling)·`ch10_toolsafe`(승인 게이트)·`11_승인게이트`·`12_Advisor�
 `skala-springai`의 `docs/SpringAI-이해-및-활용_Day3_2026-08/02_lab-guide.md` "Day 3 메인 실습" 절을
 참조.
 
-**부팅은 되지만 오늘의 학습 지점 8곳은 비어 있는 상태로 커밋돼 있다.** 아래 파일들이
-`UnsupportedOperationException("TODO ①: ...")`을 던진다 — 이게 정상이다. 두 사람이 각자 브랜치에서
-채운다.
+**✅ 완료.** TODO ①~⑧ 전부 구현했고 `./gradlew test`가 전부 통과한다. 레드팀 8종 공격도
+8/8 방어를 확인했다 — 실측 근거는 [`docs/결과보고서.md`](docs/결과보고서.md)(Step별 구현·결과·
+캡처·회고)와 [`docs/레드팀-결과표.md`](docs/레드팀-결과표.md)(교차 공격 결과 + 양쪽 브랜치
+원본 병합)에 있다.
+
+가장 크게 배운 것 한 줄(전체 회고는 결과보고서 참고): **"모델이 거절했다"는 응답만 보고
+안전하다고 판정하면 안 된다** — 차단 Advisor의 순서를 하나 옮기자 응답은 여전히 거절
+문구인데 대화 이력에는 인젝션 원문이 그대로 저장됐다. 실제로 저장·호출됐는지까지 확인해야
+방어가 검증된다.
+
+아래 절들은 스캐폴드를 처음 받았을 때의 안내(TODO 위치·시간 배분·함정)를 그대로 남겨 뒀다 —
+같은 실습을 다시 하거나 다른 조가 참고할 때 유용하기 때문이다. **지금 이 브랜치를 그대로
+받으면 TODO는 이미 채워진 상태로 보인다.**
 
 ## 실행
 
@@ -22,18 +32,19 @@ export OPENAI_API_KEY="sk-..."
 ## 확인
 
 ```bash
-./gradlew test          # 시작 시점: 8건 실패, 3건 통과(진행바 — 아래 "테스트 = 진행바" 참고)
+./gradlew test          # 완료 상태: 전부 통과(출발선이었던 8건 실패 포함)
 
 curl -X POST localhost:8080/lab3/chat -H 'Content-Type: application/json' \
      -d '{"question":"반품 규정 알려줘","sessionId":"s1"}'
+# → 규정 근거 + 출처(sources)가 붙은 답변이 온다
+
 curl localhost:8080/lab3/admin/tickets/pending
 ```
 
 Swagger UI — <http://localhost:8080/swagger-ui.html>
 
-지금 상태로 `/lab3/chat`을 호출하면 도구·Advisor·conversationId가 아직 비어 있어 예외가 난다 —
-스택트레이스는 노출되지 않고 안전한 문구 + traceId만 보인다(`Day3ExceptionHandler`, 완성).
-`/lab3/admin/tickets/pending`은 TODO와 무관하게 즉시 `[]`를 반환한다(완성).
+`Day3ExceptionHandler`는 AI 호출 실패 시에도 스택트레이스를 노출하지 않고 안전한 문구 +
+traceId만 반환한다(완성, 변경 없음).
 
 > ⚠️ **`day3-docs/*.md` 인제스트는 기동 시 자동으로 실행된다**(`PolicyIngestService`, 완성). 키가
 > 없거나 틀리면 이 단계만 실패하고 로그에 에러가 남지만 **앱은 계속 뜬다** — RAG 답변만 근거 없이
@@ -43,8 +54,9 @@ Swagger UI — <http://localhost:8080/swagger-ui.html>
 
 ## 테스트 = 진행바
 
-`./gradlew test`가 곧 완료 기준 체크리스트다. 시작 시점에 8건이 실패하는 게 정상 출발선이고,
-TODO를 하나씩 채울 때마다 해당 테스트가 통과로 바뀐다.
+**완료 상태 — 아래 표의 실패 항목은 전부 통과로 바뀌었다.** `./gradlew test`가 곧 완료 기준
+체크리스트였다. 시작 시점에 8건이 실패하는 게 정상 출발선이었고, TODO를 하나씩 채울 때마다
+해당 테스트가 통과로 바뀌었다 — 아래 표는 그 매핑을 기록으로 남긴다.
 
 | 테스트 | 처음 상태 | 통과하려면 | 완료 기준 |
 |---|---|---|---|
@@ -111,16 +123,19 @@ export OPENAI_API_KEY="sk-..."
 
 ## TODO 체크리스트 (Step별 · 완료 기준 · 참조 코드 매핑)
 
-| # | 파일 | 채울 것 | 교안 | 완료 기준 | 참조 |
-|---|---|---|---|---|---|
-| ① | `tools/OrderTools.java` | `@Tool` description + 소유자 검증 + 실패 문구 | Step 1 p.298 | 1·2 | `SpringAI_실습/ch09_tools/OrderTools.java` |
-| ② | `tools/RefundTools.java` | 환불 **접수까지만**(PENDING) + 권한 선검증 | Step 3 p.300 | 3 | `SpringAI_실습/11_승인게이트/SnackTools.java` |
-| ③ | `audit/ToolAuditAspect.java` | `@Around("@annotation(...Tool)")` 감사 + 마스킹 | Step 3 p.300 | 7 | `SpringAI_실습/ch10_toolsafe/ToolAuditAspect.java` |
-| ④ | `advisor/SafetyAdvisor.java` | 인젝션 차단(`before()`) | Step 4 p.301 | 6 | `SpringAI_실습/12_Advisor순서/이모지Advisor.java`(BaseAdvisor 골격) |
-| ⑤ | `advisor/TokenMeterAdvisor.java` | `ai.tokens`·`ai.latency` 카운터 | Step 6 p.303 | 8 | `SpringAI_실습/ch11_advisors/TokenMeterAdvisor.java` |
-| ⑥ | `config/Day3AiConfig.java` | ChatClient 빈 + Advisor 4종 순서 조립 + `defaultTools` | Step 4 p.301 | 4·6 | `SpringAI_실습/ch11_advisors/MemoryChatConfig.java`, `12_Advisor순서/Lab12Config.java` |
-| ⑦ | `service/ConsultService.java` | `conversationId` 한 곳에서 생성 + `toolContext` + 출처 추출 | Step 5 p.302 | 5 | 교안 Phase 3 코드(p.316) |
-| ⑧ | `docs/레드팀-결과표.md` | 8종 공격 실행 결과 기록 | Step 7 p.304 | 9 | — |
+| # | 상태 | 파일 | 채울 것 | 교안 | 완료 기준 | 참조 |
+|---|---|---|---|---|---|---|
+| ① | ✅ | `tools/OrderTools.java` | `@Tool` description + 소유자 검증 + 실패 문구 | Step 1 p.298 | 1·2 | `SpringAI_실습/ch09_tools/OrderTools.java` |
+| ② | ✅ | `tools/RefundTools.java` | 환불 **접수까지만**(PENDING) + 권한 선검증 | Step 3 p.300 | 3 | `SpringAI_실습/11_승인게이트/SnackTools.java` |
+| ③ | ✅ | `audit/ToolAuditAspect.java` | `@Around("@annotation(...Tool)")` 감사 + 마스킹 | Step 3 p.300 | 7 | `SpringAI_실습/ch10_toolsafe/ToolAuditAspect.java` |
+| ④ | ✅ | `advisor/SafetyAdvisor.java` | 인젝션 차단(`before()`) | Step 4 p.301 | 6 | `SpringAI_실습/12_Advisor순서/이모지Advisor.java`(BaseAdvisor 골격) |
+| ⑤ | ✅ | `advisor/TokenMeterAdvisor.java` | `ai.tokens`·`ai.latency` 카운터 | Step 6 p.303 | 8 | `SpringAI_실습/ch11_advisors/TokenMeterAdvisor.java` |
+| ⑥ | ✅ | `config/Day3AiConfig.java` | ChatClient 빈 + Advisor 4종 순서 조립 + `defaultTools` | Step 4 p.301 | 4·6 | `SpringAI_실습/ch11_advisors/MemoryChatConfig.java`, `12_Advisor순서/Lab12Config.java` |
+| ⑦ | ✅ | `service/ConsultService.java` | `conversationId` 한 곳에서 생성 + `toolContext` + 출처 추출 | Step 5 p.302 | 5 | 교안 Phase 3 코드(p.316) |
+| ⑧ | ✅ | `docs/레드팀-결과표.md` | 8종 공격 실행 결과 기록 | Step 7 p.304 | 9 | — |
+
+시간 부족 시 가장 먼저 빼도 된다고 안내했던 ⑤(TokenMeterAdvisor)까지 포함해 9개 완료 기준
+전부 채웠다.
 
 **막히면 여는 것 — 검색하지 않는다, 이 표대로 바로 연다.**
 
@@ -183,16 +198,16 @@ export OPENAI_API_KEY="sk-..."
 - `config/Day3VectorStoreConfig.java` — 인메모리 VectorStore 빈(완성)
 - `config/Day3ChatMemoryConfig.java` — 대화 메모리 빈, `day3.memory.max` 윈도우(완성)
 - `config/Day3Properties.java` — `day3.rag`·`day3.memory`·`day3.tool` 외부화(완성)
-- `config/Day3AiConfig.java` — 답변용 `ChatClient` 빈 + Advisor 조립 — **TODO ⑥**
-- `tools/OrderTools.java` — **TODO ①**
-- `tools/RefundTools.java` — **TODO ②**
-- `audit/ToolAuditAspect.java` — **TODO ③**
-- `advisor/SafetyAdvisor.java` — **TODO ④**
-- `advisor/TokenMeterAdvisor.java` — **TODO ⑤**
-- `service/ConsultService.java` — **TODO ⑦**
+- `config/Day3AiConfig.java` — 답변용 `ChatClient` 빈 + Advisor 조립 — **TODO ⑥ 완료**
+- `tools/OrderTools.java` — **TODO ① 완료**
+- `tools/RefundTools.java` — **TODO ② 완료**
+- `audit/ToolAuditAspect.java` — **TODO ③ 완료**
+- `advisor/SafetyAdvisor.java` — **TODO ④ 완료**
+- `advisor/TokenMeterAdvisor.java` — **TODO ⑤ 완료**
+- `service/ConsultService.java` — **TODO ⑦ 완료**
 - `web/ConsultController.java`, `web/AdminController.java` — REST 엔드포인트(완성, 손대지 않는다)
 - `web/Day3ExceptionHandler.java`, `ErrorResponse.java` — 예외 응답, 스택트레이스 미노출(완성)
 - `src/main/resources/day3-docs/` — 반품·배송·교환 규정 3종
-- `docs/레드팀-결과표.md` — **TODO ⑧**(공격 8종 기록 템플릿)
-- `docs/결과보고서.md` — 완료 기준 실측·회고 골격
+- `docs/레드팀-결과표.md` — **TODO ⑧ 완료**(8종 공격 실행 결과, 양쪽 브랜치 원본 병합까지 기록됨)
+- `docs/결과보고서.md` — Step 1~7 구현 내용·결과·캡처 15장·회고까지 작성 완료
 - `docker-compose.yml` — 확장 과제 "pgvector 전환" 전용
